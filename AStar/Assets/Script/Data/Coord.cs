@@ -3,6 +3,7 @@ using System.Collections;
 
 public struct Coord 
 {
+	public static Coord Zero = new Coord(0, 0);
 	public uint xPos;
 	public uint yPos;
 

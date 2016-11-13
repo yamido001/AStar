@@ -33,7 +33,7 @@ public class MapMediator : MonoBehaviour {
 			beforeType = MapView.GridType.StartPoint;
 		else if (mHasEndCo && co.Equals (mEndCo))
 			beforeType = MapView.GridType.EndPoint;
-		else if (!MapManager.Instant.CanPass (co))
+		else if (MapManager.Instant.IsBlock (co))
 			beforeType = MapView.GridType.Block;
 		
 		switch (beforeType) {
@@ -65,10 +65,10 @@ public class MapMediator : MonoBehaviour {
 	{
 		switch (type) {
 		case MapView.GridType.Empty:
-			MapManager.Instant.SetPassable (co, true);
+			MapManager.Instant.SetBlock (co, true);
 			break;
 		case MapView.GridType.Block:
-			MapManager.Instant.SetPassable (co, false);
+			MapManager.Instant.SetBlock (co, false);
 			break;
 		case MapView.GridType.StartPoint:
 			mHasStartCo = true;
@@ -97,7 +97,7 @@ public class MapMediator : MonoBehaviour {
 	{
 		if (!mHasStartCo || !mHasEndCo)
 			return;
-		view.SetPath (AStarManager.Instant.FindPath (mStartCo, mEndCo));
+		view.SetPath (AStarManager.Instant.FindPath (mStartCo, mEndCo), mEndCo);
 	}
 
 	void OnSaveDataClicked(string fileName)
@@ -132,7 +132,7 @@ public class MapMediator : MonoBehaviour {
 		MapManager.Instant.ClearData ();
 		for (int i = 0; i < saveData.blockList.Count; ++i) {
 			MapSaveCoord saveCo = saveData.blockList [i];
-			MapManager.Instant.SetPassable (new Coord (saveCo.xPos, saveCo.yPos), false);
+			MapManager.Instant.SetBlock (new Coord (saveCo.xPos, saveCo.yPos), false);
 		}
 		if (saveData.startCo != null) {
 			OnClickGird (new Coord (saveData.startCo.xPos, saveData.startCo.yPos), MapView.GridType.StartPoint);

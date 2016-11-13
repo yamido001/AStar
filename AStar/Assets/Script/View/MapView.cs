@@ -14,6 +14,7 @@ public class MapView : MonoBehaviour {
 	}
 
 	#region UIRef
+	public int iconEdgeSize = 10;
 	public int gridSize = 10;
 	public int edgeSize = 30;
 	public float togHeight = 100f;
@@ -37,6 +38,7 @@ public class MapView : MonoBehaviour {
 	public UISprite sprBg;
 	#endregion
 
+	private string mInputInitValue;
 	private UISprite mStartPoint;
 	private UISprite mEndPoint;
 	private List<UIToggle> mTogList = new List<UIToggle>();
@@ -46,11 +48,27 @@ public class MapView : MonoBehaviour {
 
 	public void Init()
 	{
+		//设置大小
 		templateObjPar.SetActive (false);
+		int mapIconSize = gridSize - 2 * iconEdgeSize;
+		blockTemplate.width = mapIconSize;
+		blockTemplate.height = mapIconSize;
+		startPointTemplate.width = mapIconSize;
+		startPointTemplate.height = mapIconSize;
+		endPointTemplate.width = mapIconSize;
+		endPointTemplate.height = mapIconSize;
+		lineTemplate.width = mapIconSize;
+		lineTemplate.height = mapIconSize;
+		pathTemplate.width = mapIconSize;
+		pathTemplate.height = mapIconSize;
+
+		//保存初始化输入框提示
+		mInputInitValue = inputSaveName.value;
+
 		//描画背景
 		int bgWidth = gridSize * (int)MapManager.Instant.MapWidth + edgeSize * 2;
 		int bgHeight = gridSize * (int)MapManager.Instant.MapHeight + edgeSize * 2;
-		sprBg.transform.localPosition = new Vector3 (-edgeSize, edgeSize, 0f);
+		sprBg.transform.localPosition = new Vector3 (0f, 0f, 0f);
 		sprBg.width = bgWidth;
 		sprBg.height = bgHeight;
 		BoxCollider collider = sprBg.GetComponent<BoxCollider> ();
@@ -59,10 +77,10 @@ public class MapView : MonoBehaviour {
 		UIEventListener.Get (collider.gameObject).onClick = OnBgClick;
 
 		//描画格子
-		float bottomPos = -MapManager.Instant.MapHeight * gridSize;
-		float topPos = 0f;
-		float leftPos = 0f;
-		float rightPos = MapManager.Instant.MapWidth * gridSize;
+		float topPos = -edgeSize;
+		float leftPos = edgeSize;
+		float bottomPos = topPos - MapManager.Instant.MapHeight * gridSize;
+		float rightPos = leftPos + MapManager.Instant.MapWidth * gridSize;
 		//竖线
 		for (int i = 0; i <= MapManager.Instant.MapWidth; ++i) {
 			float posX = i * gridSize + leftPos;
@@ -118,7 +136,7 @@ public class MapView : MonoBehaviour {
 	public void ClearData()
 	{
 		RefreshBlock ();
-		SetPath (null);
+		SetPath (null, Coord.Zero);
 		HideStartPoint ();
 		HideEndPoint ();
 	}
@@ -131,7 +149,7 @@ public class MapView : MonoBehaviour {
 		for (int i = 0; i < MapManager.Instant.MapWidth; ++i) {
 			for (int j = 0; j < MapManager.Instant.MapHeight; ++j) {
 				Coord co = new Coord ((uint)i, (uint)j);
-				if (!MapManager.Instant.CanPass (co)) {
+				if (MapManager.Instant.IsBlock (co)) {
 					UISprite sprBlock = GameObject.Instantiate (blockTemplate) as UISprite;
 					sprBlock.gameObject.SetActive (true);
 					sprBlock.transform.parent = transView;
@@ -165,7 +183,7 @@ public class MapView : MonoBehaviour {
 		mEndPoint.gameObject.SetActive (false);
 	}
 
-	public void SetPath(List<Coord> pathList)
+	public void SetPath(List<Coord> pathList, Coord toCo)
 	{
 		for (int i = 0; i < mPathList.Count; ++i) {
 			GameObject.DestroyImmediate (mPathList [i]);
@@ -177,6 +195,13 @@ public class MapView : MonoBehaviour {
 			sprPath.transform.parent = transView;
 			sprPath.transform.localScale = Vector3.one;
 			sprPath.transform.localPosition = GetGridPos (pathList [i]);
+
+			Coord nextCo = i < pathList.Count - 1 ? pathList [i + 1] : toCo;
+			Vector3 fromPos = new Vector3 (pathList [i].xPos, pathList [i].yPos, 0f);
+			Vector3 toPos = new Vector3 (nextCo.xPos, nextCo.yPos, 0f);
+			Quaternion qa = Quaternion.FromToRotation (Vector3.right, toPos - fromPos);
+			sprPath.transform.localRotation = qa;
+
 			mPathList.Add (sprPath);
 		}
 	}
@@ -196,7 +221,12 @@ public class MapView : MonoBehaviour {
 	{
 		float posX = (co.xPos + 0.5f) * gridSize;
 		float poxY = -(MapManager.Instant.MapHeight - co.yPos - 0.5f) * gridSize;
-		return new Vector3 (posX, poxY, 0f);
+		return new Vector3 (posX + edgeSize, poxY - edgeSize, 0f);
+	}
+
+	private bool IsInputNameCorrect()
+	{
+		return !(string.IsNullOrEmpty (inputSaveName.value) || mInputInitValue.Equals (inputSaveName.value));
 	}
 
 	#region UI CallBack
@@ -237,19 +267,19 @@ public class MapView : MonoBehaviour {
 
 	private void OnClearPathClicked(GameObject obj)
 	{
-		SetPath (null);
+		SetPath (null, Coord.Zero);
 	}
 
 	private void OnSaveData(GameObject go)
 	{
-		if (hdlSaveData != null)
-			hdlSaveData.Invoke ("test");
+		if (hdlSaveData != null && IsInputNameCorrect())
+			hdlSaveData.Invoke (inputSaveName.value);
 	}
 
 	private void OnLoadData(GameObject go)
 	{
-		if (hdlLoadData != null)
-			hdlLoadData.Invoke ("test");
+		if (hdlLoadData != null && IsInputNameCorrect())
+			hdlLoadData.Invoke (inputSaveName.value);
 	}
 	#endregion
 }

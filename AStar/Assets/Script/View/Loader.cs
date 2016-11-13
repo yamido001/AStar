@@ -9,7 +9,7 @@ public class Loader : MonoBehaviour {
 		GameObject view = GameObject.Instantiate (obj);
 		view.transform.parent = transform;
 		view.transform.localScale = new Vector3 (1f, 1f, 1f);
-		view.transform.localPosition = new Vector3 (-400f, 270f, 0f);
+		view.transform.localPosition = new Vector3 (-800f, 400f, 0f);
 		MapMediator mediator = view.AddComponent<MapMediator> ();
 		mediator.Init ();
 	}

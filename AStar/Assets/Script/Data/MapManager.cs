@@ -26,14 +26,14 @@ public class MapManager{
 	public uint MapWidth
 	{
 		get {
-			return 10;
+			return 100;
 		}
 	}
 
 	public uint MapHeight
 	{
 		get {
-			return 10;
+			return 80;
 		}
 	}
 
@@ -46,18 +46,27 @@ public class MapManager{
 		}
 	}
 
-	public void SetPassable(Coord co, bool canPass)
+	public void SetBlock(Coord co, bool canPass)
 	{
 		if (co.xPos >= MapWidth || co.yPos >= MapHeight)
 			return;
 		mMapPassData [co.xPos, co.yPos] = canPass;
 	}
 
-	public bool CanPass(Coord co)
+	public bool IsBlock(Coord co)
 	{
 		if (co.xPos >= MapWidth || co.yPos >= MapHeight)
 			return false;
-		return mMapPassData [co.xPos, co.yPos];
+		return !mMapPassData [co.xPos, co.yPos];
+	}
+
+	public bool CanPass(Coord fromCo, Coord endCo)
+	{
+		if (fromCo.xPos == endCo.xPos || fromCo.yPos == endCo.yPos)
+			return true;
+		Coord coEdgeOne = new Coord (fromCo.xPos, endCo.yPos);
+		Coord coEdgeTwo = new Coord (endCo.xPos, fromCo.yPos);
+		return !IsBlock (coEdgeOne) && !IsBlock (coEdgeTwo);
 	}
 
 	public List<Coord> GetBlockList()

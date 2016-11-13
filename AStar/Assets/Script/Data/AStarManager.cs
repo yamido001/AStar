@@ -14,15 +14,34 @@ public class AStarManager{
 		}
 	}
 
-	private class AStarNode
+	public AStarManager()
+	{
+		Init ();
+	}
+
+	public class AStarNode
 	{
 		public AStarNode parent;
 		public Coord co;
 		public int gLength;
+		public int fLength;
+		public int hLength;
 	}
 
-	private List<AStarNode> mOpen = new List<AStarNode>();
-	private List<AStarNode> mClose = new List<AStarNode>();
+//	private List<AStarNode> mOpen = new List<AStarNode>();
+	private QuickFindAStarList mOpen = new QuickFindAStarList();
+	private HashSet<uint> mClose = new HashSet<uint>();
+	private MapDirection[] mAllDirections = null;
+	private TimeStatistics mTimeDebug = new TimeStatistics();
+
+	private void Init()
+	{
+		Array dirArray = Enum.GetValues (typeof(MapDirection));
+		mAllDirections = new MapDirection[dirArray.Length];
+		for (int i = 0; i < mAllDirections.Length; ++i) {
+			mAllDirections [i] = (MapDirection)dirArray.GetValue (i);
+		}
+	}
 
 	public List<Coord> FindPath(Coord startCo, Coord endCo)
 	{
@@ -33,101 +52,96 @@ public class AStarManager{
 
 		AStarNode startNode = new AStarNode ();
 		startNode.co = startCo;
+		startNode.hLength = GetHLength (startNode.co, endCo);
+		startNode.gLength = 0;
+		startNode.fLength = startNode.hLength;
 		mOpen.Add (startNode);
 	
 		AStarNode endNode = null;
-
+		mTimeDebug.BeginFrameTest ();
 		while (mOpen.Count > 0) {
+			mTimeDebug.FrameTest ("JustStart");
+			int index = mOpen.GetMinFLengthIndex ();
 
-			AStarNode nearNode = null;
-			int nearNodeFinally = int.MaxValue;
-			int index = -1;
-			for (int i = 0; i < mOpen.Count; ++i) {
-				AStarNode node = mOpen [i];
-				if (!MapManager.Instant.CanPass (node.co)) {
-					continue;
-				}
-
-				int FLength = GetHLength (node.co, endCo);
-				if (node.parent != null) {
-					node.gLength = node.parent.gLength + GetGLength (node.parent.co, node.co);
-					FLength += node.gLength;
-				}
-				if (FLength >= nearNodeFinally) {
-					continue;
-				}
-
-				nearNode = node;
-				nearNodeFinally = FLength;
-				index = i;
-			}
-
-			if (nearNode == null) {
-				break;
-			}
-
-			if (nearNode.co.Equals(endCo)) {
+			AStarNode nearNode = mOpen [index];
+			if (null == endNode || endNode.hLength > nearNode.hLength)
 				endNode = nearNode;
+			//寻路正常，找到完全的路径
+			if (nearNode.co.Equals(endCo)) {
+				endNode = nearNode.parent;
 				break;
 			}
-
-			if (nearNode.co.xPos == 4 && nearNode.co.yPos == 1) {
-				int testAAA = 12;
-				++testAAA;
-			}
-
-			Array dirArray = Enum.GetValues (typeof(MapDirection));
-			for (int i = 0; i < dirArray.Length; ++i) {
-				MapDirection dir = (MapDirection)dirArray.GetValue (i);
-				if (!MapManager.Instant.HasDirectionPos (dir, nearNode.co)) {
+			mTimeDebug.FrameTest ("FindNearNode");
+			for (int i = 0; i < mAllDirections.Length; ++i) {
+				mTimeDebug.FrameTest ("ChildStart");
+				if (!MapManager.Instant.HasDirectionPos (mAllDirections[i], nearNode.co)) {
+					mTimeDebug.FrameTest ("Child node error pos");
 					continue;
 				}
+				
+				Coord childNodeCo = MapManager.Instant.GetDirectionCoord (mAllDirections[i], nearNode.co);
+				if (MapManager.Instant.IsBlock (childNodeCo)) {
+					mTimeDebug.FrameTest ("Child node in block");
+					continue;
+				}
+				if (!MapManager.Instant.CanPass (nearNode.co, childNodeCo)) {
+					mTimeDebug.FrameTest ("Child node can not pass");
+					continue;
+				}
+
+				int childNodeHLength = GetHLength (childNodeCo, endCo);
+				int childNodeGLength = nearNode.gLength + GetGLength (nearNode.co, childNodeCo);
+				int childNodeFLength = childNodeGLength + childNodeHLength;
+				mTimeDebug.FrameTest ("Child node correct");
+
+				AStarNode nodeInOpen = mOpen.GetNodeByKey (childNodeCo.Key);
+				if (null != nodeInOpen && nodeInOpen.fLength > childNodeFLength) {
+					nodeInOpen.gLength = childNodeGLength;
+					nodeInOpen.fLength = childNodeFLength;
+					nodeInOpen.parent = nearNode;
+				}
+				if (null != nodeInOpen) {
+					mTimeDebug.FrameTest ("Child node isInOpen");
+					continue;
+				}
+				mTimeDebug.FrameTest ("Child node isInOpen");
+					
+				if (mClose.Contains (childNodeCo.Key)) {
+					mTimeDebug.FrameTest ("Child node isInClose");
+					continue;
+				}
+				mTimeDebug.FrameTest ("Child node isInClose");
+
 				AStarNode childNode = new AStarNode ();
-				childNode.co = MapManager.Instant.GetDirectionCoord (dir, nearNode.co);
 				childNode.parent = nearNode;
-				childNode.gLength = nearNode.gLength + GetGLength (nearNode.co, childNode.co);
-
-				for (int j = 0; j < mOpen.Count; ++j) {
-					AStarNode openNode = mOpen [j];
-					if (!openNode.co.Equals(childNode.co))
-						continue;
-					if (openNode.gLength + GetHLength (openNode.co, endCo) > childNode.gLength + GetHLength (childNode.co, endCo)) {
-						openNode.gLength = childNode.gLength;
-						openNode.parent = nearNode;
-					}
-				}
-
-				bool isInClose = false;
-				for (int j = 0; j < mClose.Count; ++j) {
-					AStarNode closeNode = mClose [j];
-					if (closeNode.co.Equals (childNode.co)) {
-						isInClose = true;
-						break;
-					}
-				}
-				if (isInClose)
-					continue;
-
+				childNode.co = childNodeCo;
+				childNode.fLength = childNodeFLength;
+				childNode.gLength = childNodeGLength;
+				childNode.hLength = childNodeHLength;
 				mOpen.Add (childNode);
-
+				mTimeDebug.FrameTest ("Child node create");
 			}
-			
+			mTimeDebug.FrameTest ("FindNearNode finish");
 			mOpen.RemoveAt(index);
-			mClose.Add (nearNode);
-
-			mOpen.Sort(delegate(AStarNode x, AStarNode y) {
-				return (x.gLength + GetHLength (x.co, endCo)).CompareTo(y.gLength + GetHLength (y.co, endCo));
-				});
+			mClose.Add (nearNode.co.Key);
+			mTimeDebug.FrameTest ("Open remove and close add");
 		}
 
+		//起点和终点相连接时，返回空
 		if (null == endNode)
 			return null;
-
-		while (endNode.parent != null && !endNode.parent.co.Equals(startCo)) {
-			endNode = endNode.parent;
+		mTimeDebug.FrameTest ("Begin get path");
+		do {
 			path.Add (endNode.co);
-		}
+			endNode = endNode.parent;
+		} while(!endNode.co.Equals (startCo));
+//		while (endNode.parent != null && !endNode.parent.co.Equals(startCo)) {
+//				endNode = endNode.parent;
+//				path.Add (endNode.co);
+//		}
 		path.Reverse();
+		mTimeDebug.FrameTest ("Finish get path");
+		mTimeDebug.PrintFrameTest ();
 		return path;
 	}
 
@@ -141,3 +155,5 @@ public class AStarManager{
 		return (fromCo.xPos == endCo.xPos || fromCo.yPos == endCo.yPos) ? 10 : 14;
 	}
 }
+
+
